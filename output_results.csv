@@ -1,0 +1,6 @@
+comment,Predicted_Sentiment,Score
+This movie was amazing and I love it,Positive,4.0
+This product is not good,Neutral,-1.0
+The service was very bad,Negative,-1.5
+I am extremely happy with this,Positive,3.0
+This is the worst experience ever,Negative,-2.0

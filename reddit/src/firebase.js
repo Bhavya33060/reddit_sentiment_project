@@ -1,6 +1,10 @@
 // firebase.js
-import { initializeApp } from "firebase/app"
-import { getAuth, GoogleAuthProvider } from "firebase/auth"
+import { initializeApp } from "firebase/app";
+import { 
+  getAuth, 
+  GoogleAuthProvider   // ✅ ADD THIS
+} from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBHcvJ2yTUVQaQyDtMa-pfqkw1jS1TSe_s",
@@ -12,6 +16,8 @@ const firebaseConfig = {
   measurementId: "G-HZ00EGW74V"
 };
 
-const app = initializeApp(firebaseConfig)
-export const auth = getAuth(app)
-export const googleProvider = new GoogleAuthProvider()
+const app = initializeApp(firebaseConfig);
+
+export const auth = getAuth(app);
+export const db = getFirestore(app);
+export const googleProvider = new GoogleAuthProvider();  // ✅ now works

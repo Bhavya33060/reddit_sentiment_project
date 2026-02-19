@@ -27,6 +27,14 @@ const Sidebar = () => {
         <strong>AI Pro Mode</strong>
         <p>Unlock advanced sentiment analytics and trend predictions.</p>
       </div>
+<div className="coming-soon-box">
+  <span className="soon-badge">🚀 Coming Soon</span>
+  <h4>Smart Trend Predictor</h4>
+  <p>AI-powered forecasting & deeper sentiment insights.</p>
+</div>
+
+
+
 
       <button className="sidebar-logout" onClick={handleLogout}>
         Logout

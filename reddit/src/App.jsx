@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import Layout from "./components/Layout";
 import Home from "./pages/Home";
@@ -8,11 +8,13 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import SentimentOverview from "./pages/SentimentOverview";
 import SavedPosts from "./pages/SavedPosts";
-
 import PostDetails from "./pages/PostDetail";
 import Settings from "./pages/Settings";
 import About from "./pages/About";
+
 function App() {
+
+  const [searchTerm, setSearchTerm] = useState(""); // ✅ ADDED
 
   useEffect(() => {
     document.body.setAttribute("data-density", "comfortable");
@@ -24,8 +26,12 @@ function App() {
         <Route path="/" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
 
-        <Route element={<Layout />}>
-          <Route path="/home" element={<Home />} />
+        <Route
+          element={
+            <Layout setSearchTerm={setSearchTerm} />  // ✅ PASS TO LAYOUT
+          }
+        >
+          <Route path="/home" element={<Home searchTerm={searchTerm} />} /> 
           <Route path="/trending" element={<Trending />} />
           <Route path="/overview" element={<SentimentOverview />} />
           <Route path="/saved" element={<SavedPosts />} />

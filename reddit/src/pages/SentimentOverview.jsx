@@ -13,6 +13,8 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
+import { auth, db } from "../firebase";
+import { doc, getDoc } from "firebase/firestore";
 
 function SentimentOverview() {
   const [posts, setPosts] = useState([]);
@@ -21,33 +23,55 @@ function SentimentOverview() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchData = () => {
-      fetch("http://127.0.0.1:5000/api/posts")
-        .then((res) => res.json())
-        .then((data) => {
-          setPosts(data.posts);
-          setSummary(data.summary);
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      if (!user) return;
 
-          const now = new Date().toLocaleTimeString();
+      try {
+        const docSnap = await getDoc(doc(db, "users", user.uid));
 
-          setTrendData((prev) => [
-            ...prev.slice(-9),
-            {
-              time: now,
-              Positive: data.summary.Positive || 0,
-              Negative: data.summary.Negative || 0,
-              Neutral: data.summary.Neutral || 0,
-            },
-          ]);
+        let limit = 15;
+        let intervalTime = 5000;
 
-          setLoading(false);
-        })
-        .catch((err) => console.error("Fetch error:", err));
-    };
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          limit = Number(data.postLimit) || 15;
+          intervalTime = (Number(data.refreshInterval) || 5) * 1000;
+        }
 
-    fetchData();
-    const interval = setInterval(fetchData, 5000);
-    return () => clearInterval(interval);
+        const fetchData = () => {
+          fetch(`http://127.0.0.1:5000/api/posts?limit=${limit}`)
+            .then((res) => res.json())
+            .then((data) => {
+              setPosts(data.posts);
+              setSummary(data.summary);
+
+              const now = new Date().toLocaleTimeString();
+
+              setTrendData((prev) => [
+                ...prev.slice(-9),
+                {
+                  time: now,
+                  Positive: data.summary.Positive || 0,
+                  Negative: data.summary.Negative || 0,
+                  Neutral: data.summary.Neutral || 0,
+                },
+              ]);
+
+              setLoading(false);
+            })
+            .catch((err) => console.error("Fetch error:", err));
+        };
+
+        fetchData();
+        const interval = setInterval(fetchData, intervalTime);
+
+        return () => clearInterval(interval);
+      } catch (err) {
+        console.error("Settings load error:", err);
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const totalPosts = posts.length;
@@ -58,7 +82,6 @@ function SentimentOverview() {
       100
     : 0;
 
-  // 🔥 CONTROVERSY SCORE
   const calculateControversy = (summary) => {
     const { Positive = 0, Negative = 0, Neutral = 0 } = summary;
 
@@ -74,7 +97,6 @@ function SentimentOverview() {
 
   const controversyScore = calculateControversy(summary);
 
-  // 🔥 HEAT INDICATOR
   const negativePercent = totalPosts
     ? (summary.Negative / totalPosts) * 100
     : 0;
@@ -90,7 +112,6 @@ function SentimentOverview() {
     heatColor = "#f39c12";
   }
 
-  // 🧠 SMART SUMMARY
   const generateSummary = () => {
     let tone = "";
     if (sentimentScore > 50) tone = "strongly positive";
@@ -125,7 +146,6 @@ function SentimentOverview() {
 
       {!loading && (
         <>
-          {/* KPI SECTION */}
           <div className="kpi-grid">
             <div className="kpi-card">
               <h4>Total Posts</h4>
@@ -137,12 +157,14 @@ function SentimentOverview() {
               <h1>{sentimentScore.toFixed(1)}%</h1>
               <p>
                 {sentimentScore > 60
-                  ? "🚀 Strong Positive"
-                  : sentimentScore > 30
-                  ? "🙂 Moderate"
-                  : sentimentScore > 0
-                  ? "⚖ Mixed"
-                  : "⚠ Negative"}
+  ? "🚀 Strong Positive"
+  : sentimentScore > 30
+  ? "🙂 Moderate"
+  : sentimentScore > 0
+  ? "⚖ Slightly Positive"
+  : sentimentScore === 0
+  ? "⚖ Perfectly Balanced"
+  : "⚠ Negative"}
               </p>
             </div>
 
@@ -159,9 +181,6 @@ function SentimentOverview() {
             </div>
           </div>
 
-          
-
-          {/* SUMMARY CARDS */}
           <div className="analytics-grid">
             <div className="analytics-card positive">
               <h3>Positive</h3>
@@ -179,25 +198,44 @@ function SentimentOverview() {
             </div>
           </div>
 
-          {/* LINE CHART */}
           <div className="chart-box">
-            <h3>Live Sentiment Trend</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={trendData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="time" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
+  <h3>Live Sentiment Trend</h3>
 
-                <Line type="monotone" dataKey="Neutral" stroke="#95a5a6" strokeWidth={3} dot={{ r: 4 }} />
-                <Line type="monotone" dataKey="Negative" stroke="#e74c3c" strokeWidth={3} dot={{ r: 4 }} />
-                <Line type="monotone" dataKey="Positive" stroke="#2ecc71" strokeWidth={3} dot={{ r: 4 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* AREA CHART */}
+  {trendData.length > 1 ? (
+    <ResponsiveContainer width="100%" height={300}>
+      <LineChart data={trendData}>
+        <CartesianGrid strokeDasharray="3 3" />
+        <XAxis dataKey="time" />
+        <YAxis />
+        <Tooltip />
+        <Legend />
+        <Line
+          type="monotone"
+          dataKey="Neutral"
+          stroke="#95a5a6"
+          strokeWidth={3}
+          dot={{ r: 4 }}
+        />
+        <Line
+          type="monotone"
+          dataKey="Negative"
+          stroke="#e74c3c"
+          strokeWidth={3}
+          dot={{ r: 4 }}
+        />
+        <Line
+          type="monotone"
+          dataKey="Positive"
+          stroke="#2ecc71"
+          strokeWidth={3}
+          dot={{ r: 4 }}
+        />
+      </LineChart>
+    </ResponsiveContainer>
+  ) : (
+    <p style={{ padding: "20px" }}>Collecting live data...</p>
+  )}
+</div>
           <div className="chart-box">
             <h3>Sentiment Area Distribution</h3>
             <ResponsiveContainer width="100%" height={300}>
@@ -205,7 +243,6 @@ function SentimentOverview() {
                 <XAxis dataKey="time" />
                 <YAxis />
                 <Tooltip />
-
                 <Area type="monotone" dataKey="Neutral" fill="#95a5a6" stroke="#95a5a6" fillOpacity={0.3} />
                 <Area type="monotone" dataKey="Negative" fill="#e74c3c" stroke="#e74c3c" fillOpacity={0.3} />
                 <Area type="monotone" dataKey="Positive" fill="#2ecc71" stroke="#2ecc71" fillOpacity={0.3} />
@@ -213,7 +250,6 @@ function SentimentOverview() {
             </ResponsiveContainer>
           </div>
 
-          {/* BAR CHART */}
           <div className="chart-box">
             <h3>Current Distribution</h3>
             <ResponsiveContainer width="100%" height={300}>
@@ -225,7 +261,7 @@ function SentimentOverview() {
               </BarChart>
             </ResponsiveContainer>
           </div>
-          {/* Heat + Summary */}
+
           <div className="kpi-card" style={{ marginTop: "20px" }}>
             <h4>Discussion Heat</h4>
             <h1 style={{ color: heatColor }}>{heatLevel}</h1>
@@ -238,7 +274,6 @@ function SentimentOverview() {
             </p>
           </div>
         </>
-        
       )}
     </div>
   );

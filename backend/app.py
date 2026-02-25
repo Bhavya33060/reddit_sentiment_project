@@ -1,4 +1,4 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 import requests
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
@@ -46,12 +46,20 @@ def detect_emotion(text):
         return "Neutral"
 
 # ===============================
-# POSTS API
+# POSTS API (UPDATED)
 # ===============================
 
 @app.route("/api/posts")
 def get_posts():
-    url = "https://www.reddit.com/.json?limit=15"
+
+    # 🔥 Get limit from frontend
+    limit = request.args.get("limit", default=15, type=int)
+
+    # Safety limit
+    if limit > 100:
+        limit = 100
+
+    url = f"https://www.reddit.com/.json?limit={limit}"
     headers = {"User-Agent": "SentimentIQApp"}
 
     response = requests.get(url, headers=headers)
@@ -68,7 +76,6 @@ def get_posts():
         sentiment, score, confidence = analyze_sentiment(combined_text)
         emotion = detect_emotion(combined_text)
 
-        # 🔥 HEAT SCORE (correct placement)
         heat_score = round(abs(score) * math.log(post["num_comments"] + 1), 2)
 
         sentiment_counts[sentiment] += 1
@@ -82,7 +89,6 @@ def get_posts():
             "heat_score": heat_score,
             "created": post["created_utc"],
 
-            # MEDIA SUPPORT
             "post_hint": post.get("post_hint"),
             "is_video": post.get("is_video"),
             "url": post.get("url"),
@@ -105,8 +111,9 @@ def get_posts():
         "summary": sentiment_counts
     })
 
+
 # ===============================
-# COMMENTS API
+# COMMENTS API (UNCHANGED)
 # ===============================
 
 @app.route("/api/comments/<post_id>")
@@ -152,9 +159,21 @@ def get_comments(post_id):
 
     comment_cache[post_id] = comments
     return jsonify(comments)
+
+
+# ===============================
+# TRENDING API (UPDATED)
+# ===============================
+
 @app.route("/api/trending")
 def get_trending():
-    url = "https://www.reddit.com/r/news/.json?limit=20"
+
+    limit = request.args.get("limit", default=20, type=int)
+
+    if limit > 100:
+        limit = 100
+
+    url = f"https://www.reddit.com/r/news/.json?limit={limit}"
     headers = {"User-Agent": "SentimentIQApp"}
 
     response = requests.get(url, headers=headers)
@@ -181,10 +200,10 @@ def get_trending():
             "url": post.get("url")
         })
 
-    # Sort by heat score
     trending_posts.sort(key=lambda x: x["heat_score"], reverse=True)
 
-    return jsonify(trending_posts[:10])
+    return jsonify(trending_posts[:limit])
+
 
 # ===============================
 

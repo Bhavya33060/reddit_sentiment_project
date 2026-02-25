@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 
-const PostCard = ({ post, onClick }) => {
+const PostCard = ({ post, onClick, isNew }) => {
   const navigate = useNavigate();
   const [isSaved, setIsSaved] = useState(false);
 
@@ -51,7 +51,7 @@ const PostCard = ({ post, onClick }) => {
   };
 
   return (
-    <div className="post-card">
+    <div className={`post-card ${!isNew ? "seen" : ""}`}>
       <div className="vote-section">
         <span>▲</span>
         <span>{post.score}</span>
@@ -63,8 +63,9 @@ const PostCard = ({ post, onClick }) => {
 
         {/* Title */}
         <h3 onClick={onClick} style={{ cursor: "pointer" }}>
-          {post.title}
-        </h3>
+  {post.title}
+  {isNew && <span className="new-badge"> NEW</span>}
+</h3>
 
         {/* Analysis */}
         {post.analysis && (

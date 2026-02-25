@@ -13,18 +13,16 @@ function Settings() {
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
- 
 
-
-  // 🔥 NEW ANALYTICS STATES
   const [negativeThreshold, setNegativeThreshold] = useState(50);
   const [controversyThreshold, setControversyThreshold] = useState(70);
   const [refreshInterval, setRefreshInterval] = useState(5);
-  const [showRatePopup, setShowRatePopup] = useState(true);
-const [rating, setRating] = useState(0);
+  const [postLimit, setPostLimit] = useState(15);
 
+  const [showRatePopup, setShowRatePopup] = useState(false);
+  const [rating, setRating] = useState(0);
 
-  // 🔥 Load existing profile data
+  // 🔥 Load profile + check rating
   useEffect(() => {
     const loadProfile = async () => {
       const user = auth.currentUser;
@@ -35,32 +33,31 @@ const [rating, setRating] = useState(0);
 
       if (docSnap.exists()) {
         const data = docSnap.data();
+
         setFullName(data.fullName || "");
         setUsername(data.username || "");
         setBio(data.bio || "");
 
-        // Load analytics if exists
         setNegativeThreshold(data.negativeThreshold || 50);
         setControversyThreshold(data.controversyThreshold || 70);
         setRefreshInterval(data.refreshInterval || 5);
+        setPostLimit(data.postLimit || 15);
+
+        // ✅ ONLY SHOW POPUP IF USER HAS NOT RATED
+        if (data.rating && data.rating > 0) {
+          setShowRatePopup(false);
+        } else {
+          setShowRatePopup(true);
+        }
+      } else {
+        setShowRatePopup(true);
       }
     };
 
     loadProfile();
   }, []);
-useEffect(() => {
-  const hasSeen = sessionStorage.getItem("ratedPopupSeen");
 
-  if (!hasSeen) {
-    setTimeout(() => {
-      setShowRatePopup(true);
-    }, 800); // slight delay feels smoother
-
-    sessionStorage.setItem("ratedPopupSeen", "true");
-  }
-}, []);
-
-  // 🔥 Save profile + analytics
+  // 🔥 Save profile + analytics (UNCHANGED)
   const saveProfile = async () => {
     const user = auth.currentUser;
     if (!user) return;
@@ -73,10 +70,29 @@ useEffect(() => {
       negativeThreshold,
       controversyThreshold,
       refreshInterval,
+      postLimit,
     });
 
     setShowToast(true);
     setTimeout(() => setShowToast(false), 2000);
+  };
+
+  // ✅ SAVE RATING TO FIREBASE
+  const submitRating = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+    if (rating === 0) return;
+
+    await setDoc(
+      doc(db, "users", user.uid),
+      {
+        rating: rating,
+        ratedAt: new Date()
+      },
+      { merge: true }
+    );
+
+    setShowRatePopup(false);
   };
 
   return (
@@ -110,32 +126,27 @@ useEffect(() => {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
               />
-
               <input
                 placeholder="Username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
               />
-
               <textarea
                 placeholder="Bio"
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
               />
-
               <button onClick={saveProfile} className="accent-btn">
                 Save
               </button>
             </div>
           )}
 
-          {/* APPEARANCE (UNCHANGED) */}
+          {/* APPEARANCE — UNTOUCHED */}
           {activeTab === "appearance" && (
             <div className="appearance-section">
-              
               <div className="appearance-card">
                 <h3>Theme</h3>
-
                 <div className="setting-row">
                   <div>
                     <strong>Dark Mode</strong>
@@ -147,7 +158,6 @@ useEffect(() => {
 
               <div className="appearance-card">
                 <h3>Layout Density</h3>
-
                 <div className="density-options">
                   {["compact", "comfortable", "spacious"].map((mode) => (
                     <button
@@ -164,7 +174,6 @@ useEffect(() => {
 
               <div className="appearance-card">
                 <h3>Font Size</h3>
-
                 <select
                   onChange={(e) => {
                     document.documentElement.style.fontSize =
@@ -177,38 +186,36 @@ useEffect(() => {
                   <option value="20">Extra Large</option>
                 </select>
               </div>
-
             </div>
           )}
 
-          {/* 🔥 NEW ANALYTICS TAB */}
+          {/* ANALYTICS — UNTOUCHED */}
           {activeTab === "analytics" && (
             <div className="appearance-section">
 
               <div className="appearance-card">
                 <h3>🚨 Alert Thresholds</h3>
-
                 <div className="setting-row">
-                  <div>
-                    <strong>Negative Alert (%)</strong>
-                  </div>
+                  <strong>Negative Alert (%)</strong>
                   <input
                     type="number"
                     value={negativeThreshold}
-                    onChange={(e) => setNegativeThreshold(e.target.value)}
+                    onChange={(e) =>
+                      setNegativeThreshold(Number(e.target.value))
+                    }
                     min="0"
                     max="100"
                   />
                 </div>
 
                 <div className="setting-row">
-                  <div>
-                    <strong>Controversy Alert (%)</strong>
-                  </div>
+                  <strong>Controversy Alert (%)</strong>
                   <input
                     type="number"
                     value={controversyThreshold}
-                    onChange={(e) => setControversyThreshold(e.target.value)}
+                    onChange={(e) =>
+                      setControversyThreshold(Number(e.target.value))
+                    }
                     min="0"
                     max="100"
                   />
@@ -217,10 +224,11 @@ useEffect(() => {
 
               <div className="appearance-card">
                 <h3>🔄 Auto Refresh Interval</h3>
-
                 <select
                   value={refreshInterval}
-                  onChange={(e) => setRefreshInterval(e.target.value)}
+                  onChange={(e) =>
+                    setRefreshInterval(Number(e.target.value))
+                  }
                 >
                   <option value="5">5 seconds</option>
                   <option value="10">10 seconds</option>
@@ -229,50 +237,55 @@ useEffect(() => {
                 </select>
               </div>
 
+              <div className="appearance-card">
+                <h3>📊 Posts Fetch Limit</h3>
+                <select
+                  value={postLimit}
+                  onChange={(e) =>
+                    setPostLimit(Number(e.target.value))
+                  }
+                >
+                  <option value="15">15 Posts</option>
+                  <option value="20">20 Posts</option>
+                  <option value="50">50 Posts</option>
+                  <option value="100">100 Posts</option>
+                </select>
+              </div>
+
               <button onClick={saveProfile} className="accent-btn">
                 Save Analytics Settings
               </button>
-
             </div>
           )}
 
-{showRatePopup && (
-  <div className="rate-popup-overlay">
-    <div className="rate-popup">
-      <h3>❤️ Do You Love REDDITIQ?</h3>
-      <p>Rate your experience with our AI Sentiment Dashboard</p>
+          {/* RATE POPUP */}
+          {showRatePopup && (
+            <div className="rate-popup-overlay">
+              <div className="rate-popup">
+                <h3>❤️ Do You Love REDDITIQ?</h3>
+                <p>Rate your experience with our AI Sentiment Dashboard</p>
 
-      <div className="heart-row">
-        {[1, 2, 3, 4, 5].map((num) => (
-          <span
-            key={num}
-            className={`heart ${rating >= num ? "active" : ""}`}
-            onClick={() => setRating(num)}
-          >
-            ❤️
-          </span>
-        ))}
-      </div>
+                <div className="heart-row">
+                  {[1, 2, 3, 4, 5].map((num) => (
+                    <span
+                      key={num}
+                      className={`heart ${rating >= num ? "active" : ""}`}
+                      onClick={() => setRating(num)}
+                    >
+                      ❤️
+                    </span>
+                  ))}
+                </div>
 
-      {rating > 0 && (
-        <p className="rate-caption">
-          {rating >= 4
-            ? "You're making our AI blush! 💖"
-            : rating === 3
-            ? "We’ll work harder to impress you!"
-            : "Thanks for the honest feedback!"}
-        </p>
-      )}
-
-      <button
-        className="accent-btn"
-        onClick={() => setShowRatePopup(false)}
-      >
-        Submit
-      </button>
-    </div>
-  </div>
-)}
+                <button
+                  className="accent-btn"
+                  onClick={submitRating}
+                >
+                  Submit
+                </button>
+              </div>
+            </div>
+          )}
 
         </div>
       </div>
